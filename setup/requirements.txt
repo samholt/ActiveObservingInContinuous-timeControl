@@ -1,0 +1,15 @@
+gym==0.21.0
+pandas==1.5.2
+scipy
+pyglet==1.5.27
+control
+tqdm
+matplotlib
+scikit-learn
+torchdiffeq>=0.2.3
+wandb
+dotmap
+imageio
+pyvirtualdisplay
+stable_baselines3
+seaborn
