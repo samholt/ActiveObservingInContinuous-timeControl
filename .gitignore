@@ -151,3 +151,5 @@ dmypy.json
 
 # Custom
 log.txt
+.dev
+.vscode
