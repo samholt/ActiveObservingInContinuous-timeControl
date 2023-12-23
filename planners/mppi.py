@@ -1,8 +1,9 @@
-import torch
-import time
 import logging
-from torch.distributions.multivariate_normal import MultivariateNormal
+import time
+
 import numpy as np
+import torch
+from torch.distributions.multivariate_normal import MultivariateNormal
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ def is_tensor_like(x):
     return torch.is_tensor(x) or type(x) is np.ndarray
 
 
-class MPPI():
+class MPPI:
     """
     Model Predictive Path Integral control
     This implementation batch samples the trajectories and so scales well with the number of samples K.
@@ -26,23 +27,32 @@ class MPPI():
     based off of https://github.com/ferreirafabio/mppi_pendulum
     """
 
-    def __init__(self, dynamics, running_cost, nx, noise_sigma, num_samples=100, horizon=15, device="cuda:0",
-                 terminal_state_cost=None,
-                 lambda_=1.,
-                 noise_mu=None,
-                 u_min=None,
-                 u_max=None,
-                 u_init=None,
-                 U_init=None,
-                 u_scale=1,
-                 u_per_command=1,
-                 step_dependent_dynamics=False,
-                 rollout_samples=1, # Ensemble size
-                 rollout_var_cost=0,
-                 rollout_var_discount=0.95,
-                 dt=0.05,
-                 sample_null_action=False,
-                 noise_abs_cost=False):
+    def __init__(
+        self,
+        dynamics,
+        running_cost,
+        nx,
+        noise_sigma,
+        num_samples=100,
+        horizon=15,
+        device="cuda:0",
+        terminal_state_cost=None,
+        lambda_=1.0,
+        noise_mu=None,
+        u_min=None,
+        u_max=None,
+        u_init=None,
+        U_init=None,
+        u_scale=1,
+        u_per_command=1,
+        step_dependent_dynamics=False,
+        rollout_samples=1,  # Ensemble size
+        rollout_var_cost=0,
+        rollout_var_discount=0.95,
+        dt=0.05,
+        sample_null_action=False,
+        noise_abs_cost=False,
+    ):
         """
         :param dynamics: function(state, action) -> next_state (K x nx) taking in batch state (K x nx) and action (K x nu)
         :param running_cost: function(state, action) -> cost (K) taking in batch state and action (same as dynamics)
@@ -159,21 +169,21 @@ class MPPI():
         self.state = state.to(dtype=self.dtype, device=self.d)
 
         cost_total = self._compute_total_cost_batch()
-        logger.debug(f'cost_total: {cost_total.shape}')
+        logger.debug(f"cost_total: {cost_total.shape}")
 
         beta = torch.min(cost_total)
         self.cost_total_non_zero = _ensure_non_zero(cost_total, beta, 1 / self.lambda_)
 
         eta = torch.sum(self.cost_total_non_zero)
-        self.omega = (1. / eta) * self.cost_total_non_zero
+        self.omega = (1.0 / eta) * self.cost_total_non_zero
         for t in range(self.T):
             self.U[t] += torch.sum(self.omega.view(-1, 1) * self.noise[:, t], dim=0)
-        action = self.U[:self.u_per_command]
+        action = self.U[: self.u_per_command]
         # reduce dimensionality if we only need the first command
         if self.u_per_command == 1:
             action = action[0]
 
-        logger.debug(f'action: {action}')
+        logger.debug(f"action: {action}")
         return action * self.u_scale
 
     def reset(self):
@@ -196,19 +206,19 @@ class MPPI():
         else:
             state_mu = self.state.view(1, -1).repeat(K, 1)
 
-        logger.debug(f'state: {state_mu.shape}')
+        logger.debug(f"state: {state_mu.shape}")
 
         states_mu = []
         states_var = []
-        actions = []  
+        actions = []
         perturbed_actions = self.u_scale * perturbed_actions
         for t in range(T):
-            u = perturbed_actions[:,t,:]
+            u = perturbed_actions[:, t, :]
             state_mu, state_var = self._dynamics(state_mu, u, t)
             c = self._running_cost(state_mu, u)
             cost_samples += c
             if self.M > 1:
-                cost_var += c.var(dim=0) * (self.rollout_var_discount ** t)
+                cost_var += c.var(dim=0) * (self.rollout_var_discount**t)
 
             # Save total states/actions
             states_mu.append(state_mu)
@@ -220,7 +230,7 @@ class MPPI():
         actions = torch.stack(actions, dim=-2)
         states_mu = torch.stack(states_mu, dim=-2)
         states_var = torch.stack(states_var, dim=-2)
-        logger.debug(f'states: {states_mu.shape}')
+        logger.debug(f"states: {states_mu.shape}")
 
         # action perturbation cost
         if self.terminal_state_cost:
@@ -228,13 +238,13 @@ class MPPI():
             cost_samples += c
         cost_total += cost_samples.mean(dim=0)
         cost_total += cost_var * self.rollout_var_cost
-        logger.debug(f'{cost_total.shape} | {states_mu.shape} | {actions.shape}')
+        logger.debug(f"{cost_total.shape} | {states_mu.shape} | {actions.shape}")
         return cost_total, states_mu, states_var, actions
 
     def _compute_total_cost_batch(self):
         # parallelize sampling across trajectories
         # resample noise each time we take an action
-        self.noise = self.noise_dist.sample((self.K, self.T)) # K x T x nu
+        self.noise = self.noise_dist.sample((self.K, self.T))  # K x T x nu
         self.perturbed_action = self.U + self.noise
         if self.sample_null_action:
             self.perturbed_action[self.K - 1] = 0
@@ -249,10 +259,12 @@ class MPPI():
             # the actions with low noise if all states have the same cost. With abs(noise) we prefer actions close to the
             # nominal trajectory.
         else:
-            action_cost = self.lambda_ * self.noise @ self.noise_sigma_inv # Like original paper
-        logger.debug(f'action_cost: {action_cost.shape}')
+            action_cost = self.lambda_ * self.noise @ self.noise_sigma_inv  # Like original paper
+        logger.debug(f"action_cost: {action_cost.shape}")
 
-        self.cost_total, self.states_mu, self.states_var, self.actions = self._compute_rollout_costs(self.perturbed_action)
+        self.cost_total, self.states_mu, self.states_var, self.actions = self._compute_rollout_costs(
+            self.perturbed_action
+        )
         self.actions /= self.u_scale
 
         # action perturbation cost
@@ -267,10 +279,10 @@ class MPPI():
 
     def get_rollouts(self, state, num_rollouts=1):
         """
-            :param state: either (nx) vector or (num_rollouts x nx) for sampled initial states
-            :param num_rollouts: Number of rollouts with same action sequence - for generating samples with stochastic
-                                 dynamics
-            :returns states: num_rollouts x T x nx vector of trajectories
+        :param state: either (nx) vector or (num_rollouts x nx) for sampled initial states
+        :param num_rollouts: Number of rollouts with same action sequence - for generating samples with stochastic
+                             dynamics
+        :returns states: num_rollouts x T x nx vector of trajectories
 
         """
         state = state.view(-1, self.nx)
@@ -281,8 +293,9 @@ class MPPI():
         states = torch.zeros((num_rollouts, T + 1, self.nx), dtype=self.U.dtype, device=self.U.device)
         states[:, 0] = state
         for t in range(T):
-            states[:, t + 1] = self._dynamics(states[:, t].view(num_rollouts, -1),
-                                              self.u_scale * self.U[t].view(num_rollouts, -1), t)
+            states[:, t + 1] = self._dynamics(
+                states[:, t].view(num_rollouts, -1), self.u_scale * self.U[t].view(num_rollouts, -1), t
+            )
         return states[:, 1:]
 
 
@@ -305,6 +318,6 @@ def run_mppi(mppi, env, retrain_dynamics, retrain_after_iter=50, iter=1000, rend
             retrain_dynamics(dataset)
             # don't have to clear dataset since it'll be overridden, but useful for debugging
             dataset.zero_()
-        dataset[di, :mppi.nx] = torch.tensor(state, dtype=mppi.U.dtype)
-        dataset[di, mppi.nx:] = action
+        dataset[di, : mppi.nx] = torch.tensor(state, dtype=mppi.U.dtype)
+        dataset[di, mppi.nx :] = action
     return total_reward, dataset

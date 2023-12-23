@@ -1,29 +1,36 @@
 # Probabilistic ensemble model
+import logging
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import logging
-WEIGHTS_INITIALIZATION_STD=0.5
+
+WEIGHTS_INITIALIZATION_STD = 0.5
 VARIANCE_EPS = 1e-6
 TORCH_PRECISION = torch.float32
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 logger = logging.getLogger()
 
+
 class GaussianMLP(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_units=128,
-                model_activation='tanh',
-                state_std=None,
-                model_initialization='xavier',
-                ):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        hidden_units=128,
+        model_activation="tanh",
+        state_std=None,
+        model_initialization="xavier",
+    ):
         super(GaussianMLP, self).__init__()
         self.output_dim = output_dim
         self.input_dim = input_dim
         self.register_buffer("state_std", torch.tensor(state_std, dtype=TORCH_PRECISION))
 
-        if model_activation == 'tanh':
+        if model_activation == "tanh":
             activation = nn.Tanh
-        elif model_activation == 'silu':
+        elif model_activation == "silu":
             activation = nn.SiLU
         else:
             raise NotImplementedError
@@ -37,12 +44,12 @@ class GaussianMLP(nn.Module):
             activation(),
             nn.Linear(hidden_units, output_dim * 2),
         )
-        
+
         for m in self.stack.modules():
             if isinstance(m, nn.Linear):
-                if model_initialization=='xavier':
+                if model_initialization == "xavier":
                     nn.init.xavier_uniform_(m.weight)
-                elif model_initialization=='normal':
+                elif model_initialization == "normal":
                     nn.init.normal_(m.weight, mean=0, std=WEIGHTS_INITIALIZATION_STD)
 
     def forward(self, x):
@@ -51,26 +58,28 @@ class GaussianMLP(nn.Module):
         mean = mean * self.state_std
         log_var = log_var + 2.0 * torch.log(self.state_std)
         return mean, log_var
-    
+
+
 class ProbabilisticEnsemble(nn.Module):
-    def __init__(self,
-                 state_dim,
-                 action_dim,
-                 hidden_units=500,
-                 ensemble_size=5,
-                 encode_obs_time=False,
-                 state_mean=None,
-                 state_std=None,
-                 action_mean=None,
-                 action_std=None,
-                 normalize=False,
-                 normalize_time=False,
-                 dt=0.05,
-                 model_activation='tanh',
-                 model_initialization='xavier',
-                 model_pe_use_pets_log_var=True,
-                 discrete=False,
-                 ):
+    def __init__(
+        self,
+        state_dim,
+        action_dim,
+        hidden_units=500,
+        ensemble_size=5,
+        encode_obs_time=False,
+        state_mean=None,
+        state_std=None,
+        action_mean=None,
+        action_std=None,
+        normalize=False,
+        normalize_time=False,
+        dt=0.05,
+        model_activation="tanh",
+        model_initialization="xavier",
+        model_pe_use_pets_log_var=True,
+        discrete=False,
+    ):
         super(ProbabilisticEnsemble, self).__init__()
         assert ensemble_size >= 1, "Ensemble size must be at least one"
         self.encode_obs_time = encode_obs_time
@@ -93,20 +102,26 @@ class ProbabilisticEnsemble(nn.Module):
             self.max_logvar = nn.Parameter(torch.ones(1, state_dim, dtype=TORCH_PRECISION) / 2.0)
             self.min_logvar = nn.Parameter(-torch.ones(1, state_dim, dtype=TORCH_PRECISION) * 10.0)
 
+        self.models = nn.ModuleList(
+            [
+                GaussianMLP(
+                    input_dim,
+                    state_dim,
+                    hidden_units=hidden_units,
+                    model_activation=model_activation,
+                    state_std=state_std,
+                    model_initialization=model_initialization,
+                )
+                for _ in range(ensemble_size)
+            ]
+        )
 
-        self.models = nn.ModuleList([GaussianMLP(input_dim,
-                                                state_dim,
-                                                hidden_units=hidden_units,
-                                                model_activation=model_activation,
-                                                state_std=state_std,
-                                                model_initialization=model_initialization) for _ in range(ensemble_size)])
-        
     def _forward_ensemble_separate(self, in_batch_obs, in_batch_action, ts_pred):
         if self.normalize:
             batch_obs = (in_batch_obs - self.state_mean) / self.state_std
             batch_action = (in_batch_action - self.action_mean) / self.action_std
             if self.normalize_time:
-                ts_pred = (ts_pred / (self.dt*8.0))
+                ts_pred = ts_pred / (self.dt * 8.0)
         else:
             batch_obs = in_batch_obs
             batch_action = in_batch_action / 3.0
@@ -128,12 +143,20 @@ class ProbabilisticEnsemble(nn.Module):
 
     def forward(self, in_batch_obs, in_batch_action, ts_pred):
         if self.model_pe_use_pets_log_var:
-            mean_for_each_network, log_variance_for_each_network = self._forward_ensemble_separate(in_batch_obs, in_batch_action, ts_pred)
+            mean_for_each_network, log_variance_for_each_network = self._forward_ensemble_separate(
+                in_batch_obs, in_batch_action, ts_pred
+            )
             mean = mean_for_each_network.mean(dim=0)
-            variance = (torch.exp(log_variance_for_each_network) + torch.square(mean_for_each_network)).mean(dim=0) - torch.square(mean)
+            variance = (torch.exp(log_variance_for_each_network) + torch.square(mean_for_each_network)).mean(
+                dim=0
+            ) - torch.square(mean)
             return mean, variance
         else:
-            mean_for_each_network, variance_for_each_network = self._forward_ensemble_separate(in_batch_obs, in_batch_action, ts_pred)
+            mean_for_each_network, variance_for_each_network = self._forward_ensemble_separate(
+                in_batch_obs, in_batch_action, ts_pred
+            )
             mean = mean_for_each_network.mean(dim=0)
-            variance = (variance_for_each_network + torch.square(mean_for_each_network)).mean(dim=0) - torch.square(mean)
+            variance = (variance_for_each_network + torch.square(mean_for_each_network)).mean(dim=0) - torch.square(
+                mean
+            )
             return mean, variance
