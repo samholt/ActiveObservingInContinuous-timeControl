@@ -1,12 +1,14 @@
-import numpy as np
 import argparse
-import torch
 import random
-import numpy as np
 from time import time
 
+import numpy as np
+import torch
+
+
 def default_config():
-    return dict(seed_runs=1000,
+    return dict(
+        seed_runs=1000,
         seed_start=0,
         dt=0.1,
         dt_simulation=0.01,
@@ -19,28 +21,28 @@ def default_config():
         observing_fixed_frequency=1,
         discrete_planning=True,
         discrete_interval=10,
-        continuous_time_threshold=1.0, # From [0,1]
-        #==============Expert Dataset collection
+        continuous_time_threshold=1.0,  # From [0,1]
+        # ==============Expert Dataset collection
         collect_expert_samples=1e6,
         collect_expert_force_generate_new_data=False,
         collect_expert_random_action_noise=1.0,
         collect_expert_cores_per_env_sampler=16,
         collect_expert_episodes_per_sampler_task=1,
         train_with_expert_trajectories=False,
-        offline_datasets_path='./offlinedata/',
-        #==============Model parameters
-        saved_models_path='./saved_models/', 
+        offline_datasets_path="./offlinedata/",
+        # ==============Model parameters
+        saved_models_path="./saved_models/",
         normalize=True,
         normalize_time=True,
         model_pe_hidden_units=256,
         encode_obs_time=False,
         model_seed=0,
-        #====New parameters
+        # ====New parameters
         model_ensemble_size=5,
-        model_pe_activation='tanh',
-        model_pe_initialization='xavier',
+        model_pe_activation="tanh",
+        model_pe_initialization="xavier",
         model_pe_use_pets_log_var=True,
-        #==============Training parameters
+        # ==============Training parameters
         weight_decay=0,
         learning_rate=1e-4,
         training_epochs=10000000,
@@ -49,7 +51,7 @@ def default_config():
         clip_grad_norm=0.1,
         clip_grad_norm_on=False,
         train_dt_multiple=1,
-        ts_grid='exp', # ['fixed', 'uniform', 'exp']
+        ts_grid="exp",  # ['fixed', 'uniform', 'exp']
         train_samples_per_dim=10,
         iters_per_evaluation=1e15,
         lr_scheduler_step_size=20,
@@ -58,8 +60,8 @@ def default_config():
         reuse_state_actions_when_sampling_times=False,
         end_training_after_seconds=int(1350 * 6.0),
         rand_sample=True,
-        #==============Misc
-        log_folder='logs',
+        # ==============Misc
+        log_folder="logs",
         save_video=False,
         plot_telem=False,
         sweep_mode=False,
@@ -71,11 +73,11 @@ def default_config():
         print_settings=False,
         training_use_only_samples=None,
         friction=False,
-        wandb_project='ActiveObservingControl',
-        oracle_var_type='state_oracle_var',
+        wandb_project="ActiveObservingControl",
+        oracle_var_type="state_oracle_var",
         special_mode_continuous_planning_execute_only_n_actions=None,
         use_95_ci=True,
-        )
+    )
 
 
 def parse_args(config):
@@ -158,15 +160,19 @@ def get_config():
     defaults.update(args)
     return defaults
 
+
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
+
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+
 def default_config_dd():
     d_c = default_config()
     return dotdict(d_c)
+
 
 def seed_all(seed=None):
     """
@@ -183,41 +189,50 @@ def seed_all(seed=None):
     np.random.seed(seed)
     random.seed(seed)
 
+
 def load_model_cuda_memory_details():
-    return {'largest_model_pe': 1272, # MiB
-            'largest_model_oracle': 2794, #
+    return {
+        "largest_model_pe": 1272,  # MiB
+        "largest_model_oracle": 2794,  #
     }
+
 
 def load_observing_var_thresholds():
-    return {0.05: {'oderl-cartpole': {'continuous': 0.025, 'discrete': 0.25},
-            'oderl-pendulum': {'continuous': 0.025, 'discrete': 0.25},
-            'oderl-acrobot': {'continuous': 0.025, 'discrete': 0.25},
-            'oderl-cancer': {'continuous': 1.0, 'discrete': 1.5},
-    },
-    0.1: {'oderl-cartpole': {'continuous': 0.029934801, 'discrete': 0.5},
-            'oderl-pendulum': {'continuous': 0.012269268, 'discrete': 0.061973028},
-            'oderl-acrobot': {'continuous': 0.08927406, 'discrete': 0.28180087},
-            'oderl-cancer': {'continuous': 2.9376497, 'discrete': 2.5688453},
-    },
-    0.2: {'oderl-cartpole': {'continuous': 0.06576242, 'discrete': 0.8842558},
-            'oderl-pendulum': {'continuous': 0.04570341, 'discrete': 0.4898505},
-            'oderl-acrobot': {'continuous': 0.27656594, 'discrete': 1.6966783},
-            'oderl-cancer': {'continuous': 3.657069, 'discrete': 4.8863864},
-    },
-    0.4: {'oderl-cartpole': {'continuous': 0.19495021, 'discrete': 72.789734},
-            'oderl-pendulum': {'continuous': 0.046161246, 'discrete': 1.2940274},
-            'oderl-acrobot': {'continuous': 0.82613117, 'discrete': 3.5674138},
-            'oderl-cancer': {'continuous': 6.760299902695876, 'discrete': 14.775529274573692},
+    return {
+        0.05: {
+            "oderl-cartpole": {"continuous": 0.025, "discrete": 0.25},
+            "oderl-pendulum": {"continuous": 0.025, "discrete": 0.25},
+            "oderl-acrobot": {"continuous": 0.025, "discrete": 0.25},
+            "oderl-cancer": {"continuous": 1.0, "discrete": 1.5},
+        },
+        0.1: {
+            "oderl-cartpole": {"continuous": 0.029934801, "discrete": 0.5},
+            "oderl-pendulum": {"continuous": 0.012269268, "discrete": 0.061973028},
+            "oderl-acrobot": {"continuous": 0.08927406, "discrete": 0.28180087},
+            "oderl-cancer": {"continuous": 2.9376497, "discrete": 2.5688453},
+        },
+        0.2: {
+            "oderl-cartpole": {"continuous": 0.06576242, "discrete": 0.8842558},
+            "oderl-pendulum": {"continuous": 0.04570341, "discrete": 0.4898505},
+            "oderl-acrobot": {"continuous": 0.27656594, "discrete": 1.6966783},
+            "oderl-cancer": {"continuous": 3.657069, "discrete": 4.8863864},
+        },
+        0.4: {
+            "oderl-cartpole": {"continuous": 0.19495021, "discrete": 72.789734},
+            "oderl-pendulum": {"continuous": 0.046161246, "discrete": 1.2940274},
+            "oderl-acrobot": {"continuous": 0.82613117, "discrete": 3.5674138},
+            "oderl-cancer": {"continuous": 6.760299902695876, "discrete": 14.775529274573692},
+        },
     }
-    }
+
 
 def load_observing_var_threshold_ranges():
-    return {0.1: {'oderl-cartpole': {'continuous': {'lower': 0.0005, 'upper': 0.45}, 'discrete': 0.5}, # Use these ones!
-            'oderl-pendulum': {'continuous': {'lower': 0.0005, 'upper': 0.45}, 'discrete': 0.061973028},
-            'oderl-acrobot': {'continuous': {'lower': 0.02, 'upper': 5.0}, 'discrete': 0.413525},
-            'oderl-cancer': {'continuous': {'lower': 2.0, 'upper': 19.0}, 'discrete': 2.5688453},
-    },
-    0.4: {'oderl-cancer': {'continuous': {'lower': 2.0, 'upper': 19.0}, 'discrete': 14.775529274573692}}
+    return {
+        0.1: {
+            "oderl-cartpole": {"continuous": {"lower": 0.0005, "upper": 0.45}, "discrete": 0.5},  # Use these ones!
+            "oderl-pendulum": {"continuous": {"lower": 0.0005, "upper": 0.45}, "discrete": 0.061973028},
+            "oderl-acrobot": {"continuous": {"lower": 0.02, "upper": 5.0}, "discrete": 0.413525},
+            "oderl-cancer": {"continuous": {"lower": 2.0, "upper": 19.0}, "discrete": 2.5688453},
+        },
+        0.4: {"oderl-cancer": {"continuous": {"lower": 2.0, "upper": 19.0}, "discrete": 14.775529274573692}},
     }
-
-    

@@ -148,3 +148,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Custom
+log.txt
+.dev
+.vscode

@@ -1,8 +1,10 @@
+import random
+from time import time
+
 import numpy as np
 import torch
-import random
-from plot_util import df_from_log, normalize_means, generate_main_results_table
-from time import time
+from plot_util import df_from_log, generate_main_results_table, normalize_means
+
 
 def seed_all(seed=None):
     """
@@ -18,22 +20,26 @@ def seed_all(seed=None):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+
 seed_all(0)
+
 
 def extract_state_rewards(df):
     dd = {}
     for _, row in df.iterrows():
-        k, v = row['observations_taken'], row['state_reward']
+        k, v = row["observations_taken"], row["state_reward"]
         if k in dd:
             dd[k].append(v)
         else:
             dd[k] = [v]
     return dd
 
+
 # Print main table of results now
-df = df_from_log('./results/main_paper_results.txt')
+df = df_from_log("./results/main_paper_results.txt")
 df = normalize_means(df)
 df_out, table_str = generate_main_results_table(df)
-print('')
+print("")
 print(table_str)
-print('fin.')
+print("fin.")
