@@ -1,15 +1,15 @@
-gym==0.21.0
-pandas==1.5.2
-scipy
-pyglet==1.5.27
 control
-tqdm
-matplotlib
-scikit-learn
-torchdiffeq>=0.2.3
-wandb
 dotmap
+# gym==0.21.0  # Installed as part of setup/install.sh script
 imageio
+matplotlib
+pandas==1.5.2
+pyglet==1.5.27
 pyvirtualdisplay
-stable_baselines3
+scikit-learn
+scipy
 seaborn
+stable_baselines3
+torchdiffeq>=0.2.3
+tqdm
+wandb
